@@ -301,7 +301,8 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 1.5rem;
+  justify-content: center;
 }
 
 @media (min-width: 600px) {
@@ -603,3 +604,4 @@ input:checked + .slider:before {
   white-space: pre-line;
   line-height: 1.7;
 }
+.bmi-chart-wrapper { position: relative; width: 100%; max-width: 250px; height: 125px; display: flex; flex-direction: column; justify-content: center; }
