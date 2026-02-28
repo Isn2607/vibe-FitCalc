@@ -155,7 +155,7 @@ body {
   }
   .dashboard-col-small {
     flex: 1;
-    min-width: 300px;
+    min-width: 0;
   }
   .dashboard-col-half {
     flex: 1;
@@ -297,7 +297,7 @@ input:checked + .slider:before {
 
 /* SVG Gauge Meter */
 .score-container {
-  flex-grow: 1;
+  flex: 1 1 0%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -452,7 +452,7 @@ input:checked + .slider:before {
 
 /* Chart Container */
 .chart-wrapper {
-  flex-grow: 1;
+  flex: 1 1 0%;
   position: relative;
   height: 250px;
   width: 100%;
@@ -483,7 +483,7 @@ input:checked + .slider:before {
 
 /* Macros & Foods */
 .macro-container {
-  flex-grow: 1;
+  flex: 1 1 0%;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -590,7 +590,7 @@ input:checked + .slider:before {
 }
 
 .tab-content {
-  flex-grow: 1;
+  flex: 1 1 0%;
   font-size: 0.95rem;
   color: var(--text-primary);
   white-space: pre-line;
@@ -598,16 +598,18 @@ input:checked + .slider:before {
 }
 
 .suggestion-content {
-  flex-grow: 1;
+  flex: 1 1 0%;
   font-size: 0.95rem;
   color: var(--text-primary);
   white-space: pre-line;
   line-height: 1.7;
 }
 .bmi-chart-wrapper {
+  max-width: 100%;
+  overflow: hidden;
   position: relative;
   width: 100%;
   height: 250px;
-  flex-grow: 1;
-  min-width: 300px;
+  flex: 1 1 0%;
+  min-width: 0;
 }
