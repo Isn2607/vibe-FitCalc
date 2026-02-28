@@ -435,92 +435,88 @@ function renderGaugeAndReasons() {
     .join("");
 }
 
-
 function renderBMIChart() {
   const bmi = state.userStats.bmi;
-  
+
   if (state.bmiChartInstance) {
     state.bmiChartInstance.destroy();
   }
 
-  // Create a half-doughnut chart for BMI
-  const data = {
-    datasets: [{
-      data: [18.5, 6.5, 5, 10], // Underweight (<18.5), Normal (18.5-25), Overweight (25-30), Obese (30+)
-      backgroundColor: [
-        '#f39c12', // Underweight (Yellow/Blue)
-        '#2ecc71', // Normal (Green)
-        '#f39c12', // Overweight (Orange)
-        '#e74c3c'  // Obese (Red)
-      ],
-      borderWidth: 0,
-      circumference: 180,
-      rotation: 270,
-    }]
-  };
+  // To create a traditional BMI chart (x: Categories, y: BMI scale) or similar to reference
+  // We'll create a Bar chart where the background is colored based on zones
+  // and a line/point shows the user's BMI.
+  // Let's create a Bar chart with a floating point or line indicating current BMI.
 
-  // Determine pointer rotation based on BMI
-  // Map BMI to an angle between -90 and 90 degrees
-  // Total span is 0 to 40 (we cap it at 40)
-  const clampedBmi = Math.min(Math.max(bmi, 0), 40);
-  
-  // Custom plugin to draw a needle
-  const gaugeNeedle = {
-    id: 'gaugeNeedle',
-    afterDatasetDraw(chart, args, options) {
-      const { ctx, chartArea: { top, bottom, left, right, width, height } } = chart;
-      ctx.save();
-      
-      const cx = left + width / 2;
-      const cy = bottom;
-      
-      // Calculate angle
-      // Range: 0 to 40
-      // 0 = -PI/2 (left), 40 = PI/2 (right)
-      const angle = Math.PI + (clampedBmi / 40) * Math.PI;
+  // The categories of BMI
+  const bmiCategories = ["Underweight", "Normal", "Overweight", "Obese"];
 
-      // Draw Needle
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-      ctx.beginPath();
-      ctx.moveTo(0, -3);
-      ctx.lineTo(height - 10, 0);
-      ctx.lineTo(0, 3);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      
-      // Draw Dot at base
-      ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, 10);
-      ctx.fill();
-      ctx.restore();
-      
-      // Draw Text Label
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.fillText('BMI: ' + bmi.toFixed(1), cx, cy + 20);
-    }
-  };
-
+  // Using an annotation-like approach or simply a bar chart with colored bars and a scatter point for the user
   state.bmiChartInstance = new Chart(ui.bmiChartCtx, {
-    type: 'doughnut',
-    data,
+    type: "bar",
+    data: {
+      labels: bmiCategories,
+      datasets: [
+        {
+          type: "bar",
+          label: "BMI Ranges",
+          data: [18.5, 24.9, 29.9, 40], // Max values for each category for visual scale
+          backgroundColor: [
+            "#3498db", // Underweight (Blue)
+            "#2ecc71", // Normal (Green)
+            "#f1c40f", // Overweight (Yellow)
+            "#e74c3c", // Obese (Red)
+          ],
+          barPercentage: 1.0,
+          categoryPercentage: 1.0,
+        },
+        {
+          type: "line",
+          label: "Your BMI",
+          data: [bmi, bmi, bmi, bmi], // Draw a straight line across at the user's BMI
+          borderColor: "#ffffff",
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '80%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false }
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 45,
+          grid: { color: "rgba(255, 255, 255, 0.1)" },
+          ticks: { color: "#9ba1a6" },
+          title: {
+            display: true,
+            text: "BMI Value",
+            color: "#9ba1a6",
+          },
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: "#9ba1a6", font: { size: 10 } },
+        },
       },
-      layout: {
-        padding: {
-          bottom: 25 // Space for text
-        }
-      }
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              if (context.datasetIndex === 1) {
+                return "Your BMI: " + bmi.toFixed(1);
+              }
+              return context.label + " Max BMI: " + context.raw;
+            },
+          },
+        },
+      },
     },
-    plugins: [gaugeNeedle]
   });
 }
 
