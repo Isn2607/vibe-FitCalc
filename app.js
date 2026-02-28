@@ -435,92 +435,185 @@ function renderGaugeAndReasons() {
     .join("");
 }
 
-
 function renderBMIChart() {
-  const bmi = state.userStats.bmi;
-  
+  const stats = state.userStats;
+  const bmi = stats.bmi;
+
   if (state.bmiChartInstance) {
     state.bmiChartInstance.destroy();
   }
 
-  // Create a half-doughnut chart for BMI
-  const data = {
-    datasets: [{
-      data: [18.5, 6.5, 5, 10], // Underweight (<18.5), Normal (18.5-25), Overweight (25-30), Obese (30+)
-      backgroundColor: [
-        '#f39c12', // Underweight (Yellow/Blue)
-        '#2ecc71', // Normal (Green)
-        '#f39c12', // Overweight (Orange)
-        '#e74c3c'  // Obese (Red)
-      ],
-      borderWidth: 0,
-      circumference: 180,
-      rotation: 270,
-    }]
-  };
+  const minWeightKg = 40;
+  const maxWeightKg = 150;
+  const minHeightCm = 140;
+  const maxHeightCm = 210;
 
-  // Determine pointer rotation based on BMI
-  // Map BMI to an angle between -90 and 90 degrees
-  // Total span is 0 to 40 (we cap it at 40)
-  const clampedBmi = Math.min(Math.max(bmi, 0), 40);
-  
-  // Custom plugin to draw a needle
-  const gaugeNeedle = {
-    id: 'gaugeNeedle',
-    afterDatasetDraw(chart, args, options) {
-      const { ctx, chartArea: { top, bottom, left, right, width, height } } = chart;
+  const bmiZonesPlugin = {
+    id: "bmiZones",
+    beforeDraw(chart) {
+      const {
+        ctx,
+        chartArea: { top, bottom, left, right },
+        scales: { x, y },
+      } = chart;
+
       ctx.save();
-      
-      const cx = left + width / 2;
-      const cy = bottom;
-      
-      // Calculate angle
-      // Range: 0 to 40
-      // 0 = -PI/2 (left), 40 = PI/2 (right)
-      const angle = Math.PI + (clampedBmi / 40) * Math.PI;
+      ctx.beginPath();
+      ctx.rect(left, top, right - left, bottom - top);
+      ctx.clip();
 
-      // Draw Needle
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-      ctx.beginPath();
-      ctx.moveTo(0, -3);
-      ctx.lineTo(height - 10, 0);
-      ctx.lineTo(0, 3);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      
-      // Draw Dot at base
-      ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, 10);
-      ctx.fill();
+      const numSegments = 50;
+      const heightStep = (y.max - y.min) / numSegments;
+
+      const drawZone = (bmiLimit1, bmiLimit2, color) => {
+        ctx.beginPath();
+
+        for (let i = 0; i <= numSegments; i++) {
+          const h = y.min + i * heightStep;
+          const h_cm = state.isMetric ? h : h * MULTIPLIERS.INCHES_TO_CM;
+          const h_m = h_cm / 100;
+
+          let w1_kg = bmiLimit1 === 0 ? 0 : bmiLimit1 * h_m * h_m;
+          let w1 = state.isMetric ? w1_kg : w1_kg / MULTIPLIERS.LBS_TO_KG;
+
+          let xPos = x.getPixelForValue(w1);
+          let yPos = y.getPixelForValue(h);
+
+          if (i === 0) ctx.moveTo(xPos, yPos);
+          else ctx.lineTo(xPos, yPos);
+        }
+
+        for (let i = numSegments; i >= 0; i--) {
+          const h = y.min + i * heightStep;
+          const h_cm = state.isMetric ? h : h * MULTIPLIERS.INCHES_TO_CM;
+          const h_m = h_cm / 100;
+
+          let w2_kg = bmiLimit2 === Infinity ? 500 : bmiLimit2 * h_m * h_m;
+          let w2 = state.isMetric ? w2_kg : w2_kg / MULTIPLIERS.LBS_TO_KG;
+
+          let xPos = x.getPixelForValue(w2);
+          let yPos = y.getPixelForValue(h);
+
+          ctx.lineTo(xPos, yPos);
+        }
+
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+
+      drawZone(0, 18.5, "rgba(52, 152, 219, 0.4)");
+      drawZone(18.5, 25, "rgba(46, 204, 113, 0.4)");
+      drawZone(25, 30, "rgba(241, 196, 15, 0.4)");
+      drawZone(30, Infinity, "rgba(231, 76, 60, 0.4)");
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.font = "10px sans-serif";
+
+      const contourBMIs = [15, 18.5, 20, 25, 30, 35, 40];
+      for (let targetBMI of contourBMIs) {
+        ctx.beginPath();
+        let lastX, lastY;
+        for (let i = 0; i <= numSegments; i++) {
+          const h = y.min + i * heightStep;
+          const h_cm = state.isMetric ? h : h * MULTIPLIERS.INCHES_TO_CM;
+          const h_m = h_cm / 100;
+
+          let w_kg = targetBMI * h_m * h_m;
+          let w = state.isMetric ? w_kg : w_kg / MULTIPLIERS.LBS_TO_KG;
+
+          let xPos = x.getPixelForValue(w);
+          let yPos = y.getPixelForValue(h);
+
+          if (i === 0) ctx.moveTo(xPos, yPos);
+          else ctx.lineTo(xPos, yPos);
+
+          if (i === Math.floor(numSegments * 0.8)) {
+            lastX = xPos;
+            lastY = yPos;
+          }
+        }
+        ctx.stroke();
+
+        if (lastX > left && lastX < right && lastY > top && lastY < bottom) {
+          ctx.fillText(targetBMI, lastX + 2, lastY - 2);
+        }
+      }
+
       ctx.restore();
-      
-      // Draw Text Label
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.fillText('BMI: ' + bmi.toFixed(1), cx, cy + 20);
-    }
+    },
   };
+
+  const xLabel = state.isMetric ? "Weight (kg)" : "Weight (lbs)";
+  const yLabel = state.isMetric ? "Height (cm)" : "Height (in)";
 
   state.bmiChartInstance = new Chart(ui.bmiChartCtx, {
-    type: 'doughnut',
-    data,
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "You",
+          data: [
+            {
+              x: state.isMetric
+                ? stats.weight
+                : stats.weight / MULTIPLIERS.LBS_TO_KG,
+              y: state.isMetric
+                ? stats.height
+                : stats.height / MULTIPLIERS.INCHES_TO_CM,
+            },
+          ],
+          backgroundColor: "#ffffff",
+          borderColor: "#000000",
+          borderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+        },
+      ],
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '80%',
+      scales: {
+        x: {
+          type: "linear",
+          position: "bottom",
+          title: {
+            display: true,
+            text: xLabel,
+            color: "#9ba1a6",
+          },
+          min: state.isMetric ? 40 : 90,
+          max: state.isMetric ? 150 : 330,
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          ticks: { color: "#9ba1a6" },
+        },
+        y: {
+          title: {
+            display: true,
+            text: yLabel,
+            color: "#9ba1a6",
+          },
+          min: state.isMetric ? 140 : 55,
+          max: state.isMetric ? 210 : 83,
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          ticks: { color: "#9ba1a6" },
+        },
+      },
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: false }
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              return `You: ${context.parsed.x.toFixed(1)} ${state.isMetric ? "kg" : "lbs"}, ${context.parsed.y.toFixed(1)} ${state.isMetric ? "cm" : "in"} (BMI: ${bmi.toFixed(1)})`;
+            },
+          },
+        },
       },
-      layout: {
-        padding: {
-          bottom: 25 // Space for text
-        }
-      }
     },
-    plugins: [gaugeNeedle]
+    plugins: [bmiZonesPlugin],
   });
 }
 
