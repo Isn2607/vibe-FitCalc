@@ -1,0 +1,612 @@
+/**
+ * FitCalc 2.0 - Main Application Logic
+ * Refactored to include Targets, Reasons, Real Data, and Meal Tabs.
+ */
+
+// --- Constants & Config ---
+const MULTIPLIERS = {
+  MALE_BMR_CONSTANT: 5,
+  FEMALE_BMR_CONSTANT: -161,
+  LBS_TO_KG: 0.453592,
+  INCHES_TO_CM: 2.54,
+};
+
+// --- State Management ---
+const state = {
+  isMetric: true,
+  userStats: null,
+  fitnessScore: 0,
+  scoreReasons: [],
+  radarChartInstance: null,
+  macros: { p: 0, c: 0, f: 0, cals: 0 },
+  mealPlans: [], // Array of 3 strings for days
+};
+
+// --- DOM Elements ---
+const ui = {
+  form: document.getElementById("fitnessForm"),
+  unitToggle: document.getElementById("unitToggle"),
+  metricLabel: document.getElementById("metricLabel"),
+  imperialLabel: document.querySelector(".toggle-label:first-child"),
+  unitHeightSpans: document.querySelectorAll(".unit-height"),
+  unitWeightSpans: document.querySelectorAll(".unit-weight"),
+  heightInput: document.getElementById("height"),
+  weightInput: document.getElementById("weight"),
+  muscleInput: document.getElementById("muscle"),
+  resultsSection: document.getElementById("resultsSection"),
+
+  // Score & Gauge
+  gaugePath: document.getElementById("gaugePath"),
+  scoreValue: document.getElementById("scoreValue"),
+  scoreStatus: document.getElementById("scoreStatus"),
+  scoreReasonsList: document.getElementById("scoreReasonsList"),
+
+  // Metrics & Charts
+  metricsTableBody: document.getElementById("metricsTableBody"),
+  chartCtx: document.getElementById("radarChart").getContext("2d"),
+  chartRawData: document.getElementById("chartRawData"),
+
+  // Macros & Suggestions
+  macroContainer: document.getElementById("macroContainer"),
+  mealTabs: document.getElementById("mealTabs"),
+  mealText: document.getElementById("mealText"),
+  exerciseText: document.getElementById("exerciseText"),
+};
+
+// --- Initialization ---
+function init() {
+  setupEventListeners();
+}
+
+function setupEventListeners() {
+  ui.unitToggle.addEventListener("change", handleUnitToggle);
+  ui.form.addEventListener("submit", handleFormSubmit);
+
+  // Tab Listeners
+  if (ui.mealTabs) {
+    ui.mealTabs.addEventListener("click", (e) => {
+      if (e.target.classList.contains("tab-btn")) {
+        // Remove active from all
+        ui.mealTabs
+          .querySelectorAll(".tab-btn")
+          .forEach((btn) => btn.classList.remove("is-active"));
+        // Add active to clicked
+        e.target.classList.add("is-active");
+        // Update content
+        const dayIndex = parseInt(e.target.getAttribute("data-day"), 10);
+        ui.mealText.innerHTML = state.mealPlans[dayIndex];
+      }
+    });
+  }
+}
+
+// --- UI Handlers ---
+function handleUnitToggle(e) {
+  state.isMetric = e.target.checked;
+
+  if (state.isMetric) {
+    ui.metricLabel.classList.add("is-active");
+    ui.imperialLabel.classList.remove("is-active");
+    updateUnitLabels("cm", "kg");
+    convertInputValues(true);
+  } else {
+    ui.imperialLabel.classList.add("is-active");
+    ui.metricLabel.classList.remove("is-active");
+    updateUnitLabels("in", "lbs");
+    convertInputValues(false);
+  }
+}
+
+function updateUnitLabels(heightUnit, weightUnit) {
+  ui.unitHeightSpans.forEach((span) => (span.textContent = heightUnit));
+  ui.unitWeightSpans.forEach((span) => (span.textContent = weightUnit));
+}
+
+function convertInputValues(toMetric) {
+  const inputsToConvert = [ui.heightInput, ui.weightInput, ui.muscleInput];
+
+  inputsToConvert.forEach((input) => {
+    if (!input.value) return;
+    let val = parseFloat(input.value);
+    if (isNaN(val)) return;
+
+    if (toMetric) {
+      if (input === ui.heightInput) val = val * MULTIPLIERS.INCHES_TO_CM;
+      else val = val * MULTIPLIERS.LBS_TO_KG;
+    } else {
+      if (input === ui.heightInput) val = val / MULTIPLIERS.INCHES_TO_CM;
+      else val = val / MULTIPLIERS.LBS_TO_KG;
+    }
+    input.value = val.toFixed(1);
+  });
+}
+
+function handleFormSubmit(e) {
+  e.preventDefault();
+  gatherFormData();
+  calculateMetrics();
+  calculateFitnessScore();
+  updateDashboard();
+}
+
+// --- Core Logic & Calculations ---
+function gatherFormData() {
+  let weight = parseFloat(ui.weightInput.value);
+  let height = parseFloat(ui.heightInput.value);
+  let muscle = parseFloat(ui.muscleInput.value);
+
+  if (!state.isMetric) {
+    weight = weight * MULTIPLIERS.LBS_TO_KG;
+    height = height * MULTIPLIERS.INCHES_TO_CM;
+    muscle = muscle * MULTIPLIERS.LBS_TO_KG;
+  }
+
+  state.userStats = {
+    gender: document.getElementById("gender").value,
+    age: parseInt(document.getElementById("age").value, 10),
+    goal: document.getElementById("goal").value,
+    activity: parseFloat(document.getElementById("activity").value),
+    weight: weight,
+    height: height,
+    bodyFat: parseFloat(document.getElementById("bodyfat").value),
+    muscle: muscle,
+    bmi: 0,
+    ffmi: 0,
+    bmr: 0,
+    tdee: 0,
+    targetCalories: 0,
+  };
+}
+
+function calculateMetrics() {
+  const stats = state.userStats;
+  const heightInMeters = stats.height / 100;
+
+  // BMI
+  stats.bmi = stats.weight / (heightInMeters * heightInMeters);
+
+  // FFMI
+  const fatMass = stats.weight * (stats.bodyFat / 100);
+  const ffm = stats.weight - fatMass;
+  const rawFfmi = ffm / (heightInMeters * heightInMeters);
+  stats.ffmi = rawFfmi + 6.1 * (1.8 - heightInMeters); // Normalized
+
+  // BMR & TDEE
+  let baseBMR = 10 * stats.weight + 6.25 * stats.height - 5 * stats.age;
+  stats.bmr = stats.gender === "male" ? baseBMR + 5 : baseBMR - 161;
+  stats.tdee = stats.bmr * stats.activity;
+
+  // Calories
+  if (stats.goal === "lose") stats.targetCalories = stats.tdee - 500;
+  else if (stats.goal === "build") stats.targetCalories = stats.tdee + 300;
+  else stats.targetCalories = stats.tdee;
+}
+
+function calculateFitnessScore() {
+  const stats = state.userStats;
+  state.scoreReasons = [];
+  let score = 50;
+
+  // 1. Evaluate Body Fat
+  let bfScore = 0;
+  if (stats.gender === "male") {
+    if (stats.bodyFat < 8) {
+      bfScore = 15;
+      state.scoreReasons.push({
+        text: "Body fat is critically low.",
+        type: "neg",
+      });
+    } else if (stats.bodyFat <= 15) {
+      bfScore = 40;
+      state.scoreReasons.push({
+        text: `Excellent body fat percentage (${stats.bodyFat}%).`,
+        type: "pos",
+      });
+    } else if (stats.bodyFat <= 20) {
+      bfScore = 25;
+      state.scoreReasons.push({
+        text: `Good, healthy body fat levels.`,
+        type: "neu",
+      });
+    } else {
+      bfScore = 5;
+      state.scoreReasons.push({
+        text: `Body fat is above optimal ranges.`,
+        type: "neg",
+      });
+    }
+  } else {
+    if (stats.bodyFat < 15) {
+      bfScore = 15;
+      state.scoreReasons.push({
+        text: "Body fat is critically low.",
+        type: "neg",
+      });
+    } else if (stats.bodyFat <= 24) {
+      bfScore = 40;
+      state.scoreReasons.push({
+        text: `Excellent body fat percentage (${stats.bodyFat}%).`,
+        type: "pos",
+      });
+    } else if (stats.bodyFat <= 30) {
+      bfScore = 25;
+      state.scoreReasons.push({
+        text: `Good, healthy body fat levels.`,
+        type: "neu",
+      });
+    } else {
+      bfScore = 5;
+      state.scoreReasons.push({
+        text: `Body fat is above optimal ranges.`,
+        type: "neg",
+      });
+    }
+  }
+
+  // 2. Evaluate FFMI (Muscle Mass)
+  let muscleScore = 0;
+  if (stats.gender === "male") {
+    if (stats.ffmi < 18) {
+      muscleScore = 10;
+      state.scoreReasons.push({
+        text: `Low muscle mass (FFMI ${stats.ffmi.toFixed(1)}).`,
+        type: "neg",
+      });
+    } else if (stats.ffmi < 20) {
+      muscleScore = 25;
+      state.scoreReasons.push({
+        text: `Average muscle development.`,
+        type: "neu",
+      });
+    } else if (stats.ffmi < 22) {
+      muscleScore = 40;
+      state.scoreReasons.push({
+        text: `Great muscle mass (FFMI ${stats.ffmi.toFixed(1)}).`,
+        type: "pos",
+      });
+    } else {
+      muscleScore = 50;
+      state.scoreReasons.push({
+        text: `Elite muscle development!`,
+        type: "pos",
+      });
+    }
+  } else {
+    if (stats.ffmi < 15) {
+      muscleScore = 10;
+      state.scoreReasons.push({
+        text: `Low muscle mass (FFMI ${stats.ffmi.toFixed(1)}).`,
+        type: "neg",
+      });
+    } else if (stats.ffmi < 17) {
+      muscleScore = 25;
+      state.scoreReasons.push({
+        text: `Average muscle development.`,
+        type: "neu",
+      });
+    } else if (stats.ffmi < 19) {
+      muscleScore = 40;
+      state.scoreReasons.push({
+        text: `Great muscle mass (FFMI ${stats.ffmi.toFixed(1)}).`,
+        type: "pos",
+      });
+    } else {
+      muscleScore = 50;
+      state.scoreReasons.push({
+        text: `Elite muscle development!`,
+        type: "pos",
+      });
+    }
+  }
+
+  // 3. BMI check for extremes
+  if (stats.bmi < 18.5) {
+    score -= 10;
+    state.scoreReasons.push({
+      text: "BMI indicates you are underweight.",
+      type: "neg",
+    });
+  } else if (stats.bmi > 30 && stats.ffmi < 22) {
+    // Allow high BMI if highly muscular
+    score -= 10;
+    state.scoreReasons.push({
+      text: "BMI is high without corresponding high muscle mass.",
+      type: "neg",
+    });
+  }
+
+  score = bfScore + muscleScore;
+  state.fitnessScore = Math.min(Math.max(Math.round(score), 0), 100);
+}
+
+// --- Dashboard Rendering ---
+function updateDashboard() {
+  ui.resultsSection.classList.remove("is-hidden");
+  ui.resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  renderGaugeAndReasons();
+  renderTargetsTable();
+  renderRadarChart();
+  calculateAndRenderMacros();
+  renderMealsAndExercise();
+}
+
+function renderGaugeAndReasons() {
+  const score = state.fitnessScore;
+
+  // Animate Gauge Number
+  let currentVal = 0;
+  const interval = setInterval(() => {
+    if (currentVal >= score) {
+      clearInterval(interval);
+      ui.scoreValue.textContent = score;
+    } else {
+      currentVal++;
+      ui.scoreValue.textContent = currentVal;
+    }
+  }, 15);
+
+  // SVG Gauge Math (Length is 125.6 for this semi-circle arc)
+  const maxOffset = 125.6;
+  const targetOffset = maxOffset - (score / 100) * maxOffset;
+
+  // Status color
+  let color, statusText;
+  if (score < 40) {
+    color = "var(--status-low)";
+    statusText = "Needs Work";
+  } else if (score < 70) {
+    color = "var(--status-mid)";
+    statusText = "Average";
+  } else if (score < 90) {
+    color = "var(--status-high)";
+    statusText = "Excellent";
+  } else {
+    color = "var(--status-elite)";
+    statusText = "Elite";
+  }
+
+  ui.gaugePath.style.strokeDashoffset = targetOffset;
+  ui.gaugePath.style.stroke = color;
+  ui.scoreValue.style.color = color;
+  ui.scoreStatus.textContent = statusText;
+  ui.scoreStatus.style.color = color;
+
+  // Render Reasons
+  ui.scoreReasonsList.innerHTML = state.scoreReasons
+    .map((r) => {
+      const symbol = r.type === "pos" ? "↑" : r.type === "neg" ? "↓" : "•";
+      return `<li><span class="reason-${r.type}">${symbol}</span> ${r.text}</li>`;
+    })
+    .join("");
+}
+
+function renderTargetsTable() {
+  const stats = state.userStats;
+  const heightM = stats.height / 100;
+
+  // Calculate Ideals
+  const idealBMI = 22.5;
+  const idealWeightKg = idealBMI * (heightM * heightM);
+  const idealBF = stats.gender === "male" ? "12 - 15%" : "22 - 25%";
+  const idealFFMI = stats.gender === "male" ? "20 - 22" : "17 - 19";
+
+  // Format helper
+  const fmt = (val, unit) => {
+    if (state.isMetric) return `${val.toFixed(1)} ${unit}`;
+    return unit === "kg"
+      ? `${(val / MULTIPLIERS.LBS_TO_KG).toFixed(1)} lbs`
+      : val;
+  };
+
+  ui.metricsTableBody.innerHTML = `
+          <tr>
+              <td>Weight</td>
+              <td>${fmt(stats.weight, "kg")}</td>
+              <td>~ ${fmt(idealWeightKg, "kg")}</td>
+          </tr>
+          <tr>
+              <td>Body Fat</td>
+              <td>${stats.bodyFat.toFixed(1)}%</td>
+              <td>${idealBF}</td>
+          </tr>
+          <tr>
+              <td>Muscle (FFMI)</td>
+              <td>${stats.ffmi.toFixed(1)}</td>
+              <td>${idealFFMI}</td>
+          </tr>
+          <tr>
+              <td>BMI</td>
+              <td>${stats.bmi.toFixed(1)}</td>
+              <td>21.0 - 24.0</td>
+          </tr>
+      `;
+}
+
+function renderRadarChart() {
+  const stats = state.userStats;
+
+  // Normalize to 0-10 just for visual scaling of the chart
+  const fatTarget = stats.gender === "male" ? 15 : 24;
+  const fatControl = Math.max(
+    0,
+    10 - Math.abs(stats.bodyFat - fatTarget) * 0.5,
+  );
+  const muscleTarget = stats.gender === "male" ? 22 : 18;
+  const muscleDev = Math.min(10, (stats.ffmi / muscleTarget) * 10);
+  const overall = state.fitnessScore / 10;
+  const weightBalance = Math.max(0, 10 - Math.abs(stats.bmi - 22.5) * 0.5);
+
+  if (state.radarChartInstance) state.radarChartInstance.destroy();
+
+  state.radarChartInstance = new Chart(ui.chartCtx, {
+    type: "radar",
+    data: {
+      labels: [
+        "Fat Control",
+        "Muscle Dev",
+        "Overall Fitness",
+        "Weight Balance",
+      ],
+      datasets: [
+        {
+          label: "Your Metrics",
+          data: [fatControl, muscleDev, overall, weightBalance],
+          backgroundColor: "rgba(0, 255, 136, 0.15)",
+          borderColor: "#00ff88",
+          pointBackgroundColor: "#00d2ff",
+          pointBorderColor: "#fff",
+          borderWidth: 2,
+        },
+        {
+          label: "Ideal Baseline",
+          data: [9, 8, 8, 9],
+          backgroundColor: "transparent",
+          borderColor: "rgba(255, 255, 255, 0.2)",
+          borderWidth: 1,
+          borderDash: [5, 5],
+          pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          angleLines: { color: "rgba(255, 255, 255, 0.05)" },
+          grid: { color: "rgba(255, 255, 255, 0.1)" },
+          pointLabels: { color: "#9ba1a6", font: { size: 11 } },
+          ticks: { display: false, min: 0, max: 10 },
+        },
+      },
+      plugins: {
+        legend: { position: "bottom", labels: { color: "#f0f2f5" } },
+        tooltip: { enabled: false }, // Hide tooltip, show raw data below
+      },
+    },
+  });
+
+  // Display raw numbers below chart
+  ui.chartRawData.innerHTML = `
+        <div class="raw-data-item">Raw FFMI<span>${stats.ffmi.toFixed(1)}</span></div>
+        <div class="raw-data-item">Body Fat<span>${stats.bodyFat}%</span></div>
+        <div class="raw-data-item">BMI<span>${stats.bmi.toFixed(1)}</span></div>
+    `;
+}
+
+function calculateAndRenderMacros() {
+  const stats = state.userStats;
+  const cals = Math.round(stats.targetCalories);
+
+  let proteinPct, carbPct, fatPct;
+  if (stats.goal === "lose") {
+    proteinPct = 0.4;
+    carbPct = 0.3;
+    fatPct = 0.3;
+  } else if (stats.goal === "build") {
+    proteinPct = 0.3;
+    carbPct = 0.5;
+    fatPct = 0.2;
+  } else {
+    proteinPct = 0.3;
+    carbPct = 0.4;
+    fatPct = 0.3;
+  }
+
+  const pGrams = Math.round((cals * proteinPct) / 4);
+  const cGrams = Math.round((cals * carbPct) / 4);
+  const fGrams = Math.round((cals * fatPct) / 9);
+
+  // Calculate Equivalents
+  // Protein: Chicken breast (100g = ~31g protein), Eggs (1 large = ~6g)
+  const chickenAmt = Math.round((pGrams / 31) * 100);
+  const eggsAmt = Math.round(pGrams / 6);
+
+  // Carbs: Cooked white rice (100g = ~28g carbs), Oats (100g = ~66g carbs)
+  const riceAmt = Math.round((cGrams / 28) * 100);
+  const oatsAmt = Math.round((cGrams / 66) * 100);
+
+  // Fats: Almonds (100g = ~50g fat), Olive oil (1 tbsp = ~14g fat)
+  const almondsAmt = Math.round((fGrams / 50) * 100);
+  const oilAmt = Math.round(fGrams / 14);
+
+  ui.macroContainer.innerHTML = `
+        <div class="macro-header">Target Daily Intake: <span>${cals}</span> kcal</div>
+        <div class="macro-grid">
+            <div class="macro-box">
+                <h4><span class="protein-title">Protein</span> <span class="grams">${pGrams}g</span></h4>
+                <div style="font-size:0.75rem; color:var(--text-secondary)">Daily equivalent choices:</div>
+                <ul class="food-list">
+                    <li>~${chickenAmt}g of Chicken Breast</li>
+                    <li>OR ~${eggsAmt} Large Eggs</li>
+                    <li>OR ~${(pGrams / 25).toFixed(1)} Scoops Whey</li>
+                </ul>
+            </div>
+            <div class="macro-box">
+                <h4><span class="carb-title">Carbs</span> <span class="grams">${cGrams}g</span></h4>
+                <div style="font-size:0.75rem; color:var(--text-secondary)">Daily equivalent choices:</div>
+                <ul class="food-list">
+                    <li>~${riceAmt}g of Cooked Rice</li>
+                    <li>OR ~${oatsAmt}g of Raw Oats</li>
+                    <li>OR ~${(cGrams / 25).toFixed(1)} Medium Bananas</li>
+                </ul>
+            </div>
+            <div class="macro-box">
+                <h4><span class="fat-title">Fats</span> <span class="grams">${fGrams}g</span></h4>
+                <div style="font-size:0.75rem; color:var(--text-secondary)">Daily equivalent choices:</div>
+                <ul class="food-list">
+                    <li>~${almondsAmt}g of Almonds</li>
+                    <li>OR ~${oilAmt} Tbsp Olive Oil</li>
+                    <li>OR ~${(fGrams / 15).toFixed(1)} Whole Avocados</li>
+                </ul>
+            </div>
+        </div>
+    `;
+}
+
+function renderMealsAndExercise() {
+  const stats = state.userStats;
+
+  // Generate 3 Days of Meals
+  if (stats.goal === "lose") {
+    state.mealPlans = [
+      `<strong>Breakfast:</strong> 3 Egg white scramble with spinach, tomatoes, and 1 slice whole wheat toast.\n<strong>Lunch:</strong> Grilled chicken salad with lots of greens, cucumbers, and a light vinaigrette.\n<strong>Dinner:</strong> Baked white fish (cod/tilapia) with steamed broccoli and small side of quinoa.\n<strong>Snack:</strong> 1 cup Greek yogurt.`,
+      `<strong>Breakfast:</strong> Protein oatmeal (1/2 cup oats mixed with 1 scoop protein powder) and berries.\n<strong>Lunch:</strong> Turkey wrap using a low-carb tortilla, mustard, and mixed greens.\n<strong>Dinner:</strong> Lean ground beef (96/4) stir-fry with zucchini and bell peppers.\n<strong>Snack:</strong> Apple slices with 1 tbsp almond butter.`,
+      `<strong>Breakfast:</strong> Protein smoothie (whey, spinach, half banana, almond milk).\n<strong>Lunch:</strong> Tuna salad (made with Greek yogurt instead of mayo) over a bed of spinach.\n<strong>Dinner:</strong> Grilled chicken breast with roasted asparagus.\n<strong>Snack:</strong> Cottage cheese with a few almonds.`,
+    ];
+  } else if (stats.goal === "build") {
+    state.mealPlans = [
+      `<strong>Breakfast:</strong> 4 Whole eggs, 2 slices avocado toast, and a glass of whole milk.\n<strong>Lunch:</strong> Large portion of chicken breast, 1.5 cups jasmine rice, roasted vegetables.\n<strong>Dinner:</strong> 8oz Steak, sweet potato, and green beans cooked in olive oil.\n<strong>Snack:</strong> Mass-gainer shake or peanut butter sandwich.`,
+      `<strong>Breakfast:</strong> Large bowl of oatmeal with peanut butter, chia seeds, and protein powder.\n<strong>Lunch:</strong> 8oz Ground turkey, 1.5 cups pasta, side salad with olive oil dressing.\n<strong>Dinner:</strong> Salmon fillet, 1 cup quinoa, roasted Brussels sprouts.\n<strong>Snack:</strong> Trail mix (nuts, dried fruit) and cottage cheese.`,
+      `<strong>Breakfast:</strong> 3-Egg omelet with cheese and ham, side of hash browns.\n<strong>Lunch:</strong> 2 Chicken and bean burritos with cheese and guacamole.\n<strong>Dinner:</strong> Pork tenderloin, mashed potatoes, and buttered peas.\n<strong>Snack:</strong> Protein bar and a large banana.`,
+    ];
+  } else {
+    state.mealPlans = [
+      `<strong>Breakfast:</strong> 2 Whole eggs, 1 slice avocado toast.\n<strong>Lunch:</strong> Turkey wrap with mixed greens and a side of fruit.\n<strong>Dinner:</strong> Lean pork or tofu stir-fry with mixed vegetables and 1 cup rice.\n<strong>Snack:</strong> Apple slices with 1 tbsp almond butter.`,
+      `<strong>Breakfast:</strong> Oatmeal with a handful of berries and a drizzle of honey.\n<strong>Lunch:</strong> Grilled chicken Caesar salad (light dressing).\n<strong>Dinner:</strong> Baked salmon with a side of couscous and steamed broccoli.\n<strong>Snack:</strong> Greek yogurt.`,
+      `<strong>Breakfast:</strong> Protein smoothie (whey, mixed berries, almond milk).\n<strong>Lunch:</strong> Tuna salad sandwich on whole wheat bread.\n<strong>Dinner:</strong> Chicken thigh roasted with sweet potatoes and carrots.\n<strong>Snack:</strong> Handful of mixed nuts.`,
+    ];
+  }
+
+  // Reset tabs and show Day 1
+  ui.mealTabs.querySelectorAll(".tab-btn").forEach((btn, i) => {
+    if (i === 0) btn.classList.add("is-active");
+    else btn.classList.remove("is-active");
+  });
+  ui.mealText.innerHTML = state.mealPlans[0];
+
+  // Exercise Strategy
+  let exStr = "";
+  if (stats.goal === "lose") {
+    exStr = `<strong>Goal: Preserve Muscle, Burn Fat</strong>\n\n• <strong>Resistance:</strong> Lift heavy 3x/week. Focus on compound movements to signal your body to keep muscle.\n• <strong>Cardio:</strong> 3-4 sessions of LISS (Low-Intensity Steady State) like walking on an incline or cycling for 45 mins. Burns fat, spares recovery.\n• <strong>NEAT:</strong> Hit 10,000 steps daily.`;
+  } else if (stats.goal === "build") {
+    exStr = `<strong>Goal: Maximum Hypertrophy (Muscle Growth)</strong>\n\n• <strong>Resistance:</strong> Train 4-5x/week using a structured split (e.g., Push/Pull/Legs). Prioritize progressive overload (adding weight or reps each week).\n• <strong>Cardio:</strong> Limit to 1-2 short sessions. Don't burn the calories needed for growth.\n• <strong>Recovery:</strong> Muscle grows in bed, not the gym. Get 8 hours of sleep.`;
+  } else {
+    exStr = `<strong>Goal: Maintenance & Health</strong>\n\n• <strong>Resistance:</strong> Train 3x/week full-body to maintain current mass.\n• <strong>Cardio:</strong> 2 sessions of moderate cardio (jogging, swimming) for heart health.\n• <strong>Flexibility:</strong> Add 1 session of yoga or deep stretching to maintain mobility.`;
+  }
+  ui.exerciseText.innerHTML = exStr;
+}
+
+// Start app
+init();

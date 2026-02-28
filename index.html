@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FitCalc 2.0 | Advanced Fitness Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="header">
+        <h1 class="header__title">
+          Fit<span class="text-accent">Calc</span>
+          <span class="badge">PRO</span>
+        </h1>
+        <div class="toggle-container">
+          <span class="toggle-label">Imperial</span>
+          <label class="switch">
+            <input type="checkbox" id="unitToggle" checked />
+            <span class="slider round"></span>
+          </label>
+          <span class="toggle-label is-active" id="metricLabel">Metric</span>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <!-- INPUT SIDEBAR -->
+        <aside class="sidebar">
+          <section class="card input-section">
+            <h2 class="card__title">Your Stats</h2>
+            <form id="fitnessForm" class="form">
+              <div class="form__group form__group--row">
+                <div class="form__field">
+                  <label for="gender">Gender</label>
+                  <select id="gender" required>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div class="form__field">
+                  <label for="age">Age</label>
+                  <input
+                    type="number"
+                    id="age"
+                    min="15"
+                    max="100"
+                    required
+                    placeholder="Years"
+                  />
+                </div>
+              </div>
+
+              <div class="form__group">
+                <label for="goal">Primary Goal</label>
+                <select id="goal" required>
+                  <option value="lose">Lose Fat</option>
+                  <option value="maintain" selected>Maintain / Recomp</option>
+                  <option value="build">Build Muscle</option>
+                </select>
+              </div>
+
+              <div class="form__group">
+                <label for="activity">Daily Activity</label>
+                <select id="activity" required>
+                  <option value="1.2">Sedentary (Office job)</option>
+                  <option value="1.375">Light (Exercise 1-3x/wk)</option>
+                  <option value="1.55" selected>
+                    Moderate (Exercise 3-5x/wk)
+                  </option>
+                  <option value="1.725">Active (Exercise 6-7x/wk)</option>
+                </select>
+              </div>
+
+              <div class="form__group form__group--row">
+                <div class="form__field">
+                  <label for="height"
+                    >Height (<span class="unit-height">cm</span>)</label
+                  >
+                  <input
+                    type="number"
+                    id="height"
+                    step="0.1"
+                    required
+                    placeholder="175"
+                  />
+                </div>
+                <div class="form__field">
+                  <label for="weight"
+                    >Weight (<span class="unit-weight">kg</span>)</label
+                  >
+                  <input
+                    type="number"
+                    id="weight"
+                    step="0.1"
+                    required
+                    placeholder="70"
+                  />
+                </div>
+              </div>
+
+              <div class="form__group form__group--row">
+                <div class="form__field">
+                  <label for="bodyfat">Body Fat %</label>
+                  <input
+                    type="number"
+                    id="bodyfat"
+                    step="0.1"
+                    required
+                    placeholder="15"
+                  />
+                </div>
+                <div class="form__field">
+                  <label for="muscle"
+                    >Muscle Mass (<span class="unit-weight">kg</span>)</label
+                  >
+                  <input
+                    type="number"
+                    id="muscle"
+                    step="0.1"
+                    required
+                    placeholder="35"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn--primary" id="calculateBtn">
+                Generate Dashboard
+              </button>
+            </form>
+          </section>
+        </aside>
+
+        <!-- RESULTS DASHBOARD -->
+        <section class="results-dashboard is-hidden" id="resultsSection">
+          <!-- TOP ROW: METER & TARGETS -->
+          <div class="dashboard-row">
+            <!-- 6. New Meter & 2. Reasons -->
+            <div class="card score-card dashboard-col-large">
+              <h2 class="card__title">Overall Fitness Score</h2>
+              <div class="score-container">
+                <!-- SVG Gauge -->
+                <div class="gauge-wrapper">
+                  <svg viewBox="0 0 100 50" class="gauge">
+                    <path
+                      class="gauge-bg"
+                      d="M 10,50 A 40,40 0 0,1 90,50"
+                      fill="none"
+                      stroke-width="10"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      id="gaugePath"
+                      class="gauge-fill"
+                      d="M 10,50 A 40,40 0 0,1 90,50"
+                      fill="none"
+                      stroke-width="10"
+                      stroke-linecap="round"
+                      stroke-dasharray="125.6"
+                      stroke-dashoffset="125.6"
+                    />
+                  </svg>
+                  <div class="gauge-content">
+                    <span id="scoreValue" class="gauge-value">0</span>
+                    <span id="scoreStatus" class="gauge-status">Pending</span>
+                  </div>
+                </div>
+
+                <!-- Breakdown Reasons -->
+                <div class="score-breakdown">
+                  <h3>Score Breakdown:</h3>
+                  <ul id="scoreReasonsList" class="reasons-list">
+                    <!-- JS Injects list items here -->
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1. Target Metrics Table -->
+            <div class="card targets-card dashboard-col-small">
+              <h2 class="card__title">Metrics & Targets</h2>
+              <div class="table-container">
+                <table class="metrics-table">
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      <th>Current</th>
+                      <th>Target</th>
+                    </tr>
+                  </thead>
+                  <tbody id="metricsTableBody">
+                    <!-- JS Injects rows here -->
+                  </tbody>
+                </table>
+              </div>
+              <p class="target-note">
+                *Targets estimated for your height & gender.
+              </p>
+            </div>
+          </div>
+
+          <!-- MIDDLE ROW: CHART & MACROS -->
+          <div class="dashboard-row">
+            <!-- 3. Real Data Chart -->
+            <div class="card chart-card dashboard-col-small">
+              <h2 class="card__title">Body Composition</h2>
+              <div class="chart-wrapper">
+                <canvas id="radarChart"></canvas>
+              </div>
+            </div>
+
+            <!-- 4. Macros & Food Equivalents -->
+            <div class="card macros-card dashboard-col-large">
+              <h2 class="card__title">Nutrition & Equivalents</h2>
+              <div id="macroContainer" class="macro-container">
+                <!-- JS Injects macros and food equivalents here -->
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM ROW: MEALS & EXERCISE -->
+          <div class="dashboard-row">
+            <!-- 5. Meal Suggestions with Tabs -->
+            <div class="card meal-card dashboard-col-half">
+              <div class="card__header">
+                <h2 class="card__title">Meal Plan</h2>
+                <div class="tabs" id="mealTabs">
+                  <button type="button" class="tab-btn is-active" data-day="0">
+                    Day 1
+                  </button>
+                  <button type="button" class="tab-btn" data-day="1">
+                    Day 2
+                  </button>
+                  <button type="button" class="tab-btn" data-day="2">
+                    Day 3
+                  </button>
+                </div>
+              </div>
+              <div class="tab-content" id="mealText">
+                Calculate to see your customized meal plan.
+              </div>
+            </div>
+
+            <div class="card exercise-card dashboard-col-half">
+              <h2 class="card__title">Exercise Strategy</h2>
+              <div class="suggestion-content" id="exerciseText">
+                Calculate to see exercise recommendations.
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
