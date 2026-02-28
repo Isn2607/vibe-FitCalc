@@ -54,7 +54,44 @@ const ui = {
 };
 
 // --- Initialization ---
+function loadSavedData() {
+  const savedData = localStorage.getItem("fitcalc_userdata");
+  if (savedData) {
+    try {
+      const data = JSON.parse(savedData);
+      if (data.isMetric !== undefined) {
+        ui.unitToggle.checked = data.isMetric;
+        state.isMetric = data.isMetric;
+        if (state.isMetric) {
+          ui.metricLabel.classList.add("is-active");
+          ui.imperialLabel.classList.remove("is-active");
+          updateUnitLabels("cm", "kg");
+        } else {
+          ui.imperialLabel.classList.add("is-active");
+          ui.metricLabel.classList.remove("is-active");
+          updateUnitLabels("in", "lbs");
+        }
+      }
+      if (data.gender) document.getElementById("gender").value = data.gender;
+      if (data.age) document.getElementById("age").value = data.age;
+      if (data.goal) document.getElementById("goal").value = data.goal;
+      if (data.activity)
+        document.getElementById("activity").value = data.activity;
+      if (data.rawHeight)
+        document.getElementById("height").value = data.rawHeight;
+      if (data.rawWeight)
+        document.getElementById("weight").value = data.rawWeight;
+      if (data.bodyFat) document.getElementById("bodyfat").value = data.bodyFat;
+      if (data.rawMuscle)
+        document.getElementById("muscle").value = data.rawMuscle;
+    } catch (e) {
+      console.error("Error loading saved data", e);
+    }
+  }
+}
+
 function init() {
+  loadSavedData();
   setupEventListeners();
 }
 
@@ -123,6 +160,21 @@ function convertInputValues(toMetric) {
 
 function handleFormSubmit(e) {
   e.preventDefault();
+
+  // Save data to localStorage
+  const dataToSave = {
+    isMetric: ui.unitToggle.checked,
+    gender: document.getElementById("gender").value,
+    age: document.getElementById("age").value,
+    goal: document.getElementById("goal").value,
+    activity: document.getElementById("activity").value,
+    rawHeight: document.getElementById("height").value,
+    rawWeight: document.getElementById("weight").value,
+    bodyFat: document.getElementById("bodyfat").value,
+    rawMuscle: document.getElementById("muscle").value,
+  };
+  localStorage.setItem("fitcalc_userdata", JSON.stringify(dataToSave));
+
   gatherFormData();
   calculateMetrics();
   calculateFitnessScore();
