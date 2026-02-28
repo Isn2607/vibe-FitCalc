@@ -140,8 +140,8 @@
             <div class="card score-card dashboard-col-half">
               <h2 class="card__title">Overall Fitness Score</h2>
               <div class="score-container">
-                <!-- SVG Gauge -->
-                <div class="score-visuals-col">
+                <div class="score-top-row">
+                  <!-- SVG Gauge -->
                   <div class="gauge-wrapper">
                     <svg viewBox="0 0 100 50" class="gauge">
                       <path
@@ -168,19 +168,18 @@
                     </div>
                   </div>
 
-                  <!-- BMI Chart -->
-                  <div class="bmi-chart-wrapper">
-                    <canvas id="bmiChart"></canvas>
-                  </div>
-
                   <!-- Breakdown Reasons -->
+                  <div class="score-breakdown">
+                    <h3>Score Breakdown:</h3>
+                    <ul id="scoreReasonsList" class="reasons-list">
+                      <!-- JS Injects list items here -->
+                    </ul>
+                  </div>
                 </div>
 
-                <div class="score-breakdown">
-                  <h3>Score Breakdown:</h3>
-                  <ul id="scoreReasonsList" class="reasons-list">
-                    <!-- JS Injects list items here -->
-                  </ul>
+                <!-- BMI Chart -->
+                <div class="bmi-chart-wrapper">
+                  <canvas id="bmiChart"></canvas>
                 </div>
               </div>
             </div>
