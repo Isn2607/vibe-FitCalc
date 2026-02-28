@@ -137,7 +137,7 @@
           <!-- TOP ROW: METER & TARGETS -->
           <div class="dashboard-row">
             <!-- 6. New Meter & 2. Reasons -->
-            <div class="card score-card dashboard-col-large">
+            <div class="card score-card dashboard-col-half">
               <h2 class="card__title">Overall Fitness Score</h2>
               <div class="score-container">
                 <!-- SVG Gauge -->
@@ -177,10 +177,13 @@
               </div>
             </div>
 
-            <!-- 1. Target Metrics Table -->
-            <div class="card targets-card dashboard-col-small">
-              <h2 class="card__title">Metrics & Targets</h2>
-              <div class="table-container">
+            <!-- 1. Combined Body Comp & Targets -->
+            <div class="card chart-card dashboard-col-half">
+              <h2 class="card__title">Body Composition & Targets</h2>
+              <div class="chart-wrapper">
+                <canvas id="realDataChart"></canvas>
+              </div>
+              <div class="table-container" style="margin-top: 1rem">
                 <table class="metrics-table">
                   <thead>
                     <tr>
@@ -202,15 +205,6 @@
 
           <!-- MIDDLE ROW: CHART & MACROS -->
           <div class="dashboard-row">
-            <!-- 3. Real Data Chart -->
-            <div class="card chart-card dashboard-col-small">
-              <h2 class="card__title">Body Composition</h2>
-              <div class="chart-wrapper">
-                <canvas id="radarChart"></canvas>
-              </div>
-              <div id="chartRawData" class="chart-raw-data"></div>
-            </div>
-
             <!-- 4. Macros & Food Equivalents -->
             <div class="card macros-card dashboard-col-large">
               <h2 class="card__title">Nutrition & Equivalents</h2>

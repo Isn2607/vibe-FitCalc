@@ -17,7 +17,7 @@ const state = {
   userStats: null,
   fitnessScore: 0,
   scoreReasons: [],
-  radarChartInstance: null,
+  realDataChartInstance: null,
   macros: { p: 0, c: 0, f: 0, cals: 0 },
   mealPlans: [], // Array of 3 strings for days
 };
@@ -43,8 +43,7 @@ const ui = {
 
   // Metrics & Charts
   metricsTableBody: document.getElementById("metricsTableBody"),
-  chartCtx: document.getElementById("radarChart").getContext("2d"),
-  chartRawData: document.getElementById("chartRawData"),
+  chartCtx: document.getElementById("realDataChart").getContext("2d"),
 
   // Macros & Suggestions
   macroContainer: document.getElementById("macroContainer"),
@@ -378,7 +377,7 @@ function updateDashboard() {
 
   renderGaugeAndReasons();
   renderTargetsTable();
-  renderRadarChart();
+  renderRealDataChart();
   calculateAndRenderMacros();
   renderMealsAndExercise();
 }
@@ -475,49 +474,56 @@ function renderTargetsTable() {
       `;
 }
 
-function renderRadarChart() {
+function renderRealDataChart() {
   const stats = state.userStats;
+  const heightM = stats.height / 100;
+  const idealWeightKg = 22.5 * (heightM * heightM);
 
-  // Normalize to 0-10 just for visual scaling of the chart
-  const fatTarget = stats.gender === "male" ? 15 : 24;
-  const fatControl = Math.max(
-    0,
-    10 - Math.abs(stats.bodyFat - fatTarget) * 0.5,
-  );
-  const muscleTarget = stats.gender === "male" ? 22 : 18;
-  const muscleDev = Math.min(10, (stats.ffmi / muscleTarget) * 10);
-  const overall = state.fitnessScore / 10;
-  const weightBalance = Math.max(0, 10 - Math.abs(stats.bmi - 22.5) * 0.5);
+  // Real Data for Chart
+  let targetBF = stats.gender === "male" ? 13.5 : 23.5;
+  let targetFFMI = stats.gender === "male" ? 21 : 18;
 
-  if (state.radarChartInstance) state.radarChartInstance.destroy();
+  const currentData = [stats.weight, stats.bodyFat, stats.ffmi, stats.bmi];
 
-  state.radarChartInstance = new Chart(ui.chartCtx, {
-    type: "radar",
+  const targetData = [idealWeightKg, targetBF, targetFFMI, 22.5];
+
+  if (state.realDataChartInstance) state.realDataChartInstance.destroy();
+
+  state.realDataChartInstance = new Chart(ui.chartCtx, {
+    type: "bar",
     data: {
       labels: [
-        "Fat Control",
-        "Muscle Dev",
-        "Overall Fitness",
-        "Weight Balance",
+        "Weight (" + (state.isMetric ? "kg" : "lbs") + ")",
+        "Body Fat %",
+        "Muscle (FFMI)",
+        "BMI",
       ],
       datasets: [
         {
-          label: "Your Metrics",
-          data: [fatControl, muscleDev, overall, weightBalance],
-          backgroundColor: "rgba(0, 255, 136, 0.15)",
-          borderColor: "#00ff88",
-          pointBackgroundColor: "#00d2ff",
-          pointBorderColor: "#fff",
-          borderWidth: 2,
+          label: "Current",
+          data: state.isMetric
+            ? currentData
+            : [
+                currentData[0] / MULTIPLIERS.LBS_TO_KG,
+                currentData[1],
+                currentData[2],
+                currentData[3],
+              ],
+          backgroundColor: "#00d2ff",
+          borderRadius: 4,
         },
         {
-          label: "Ideal Baseline",
-          data: [9, 8, 8, 9],
-          backgroundColor: "transparent",
-          borderColor: "rgba(255, 255, 255, 0.2)",
-          borderWidth: 1,
-          borderDash: [5, 5],
-          pointRadius: 0,
+          label: "Target",
+          data: state.isMetric
+            ? targetData
+            : [
+                targetData[0] / MULTIPLIERS.LBS_TO_KG,
+                targetData[1],
+                targetData[2],
+                targetData[3],
+              ],
+          backgroundColor: "rgba(255, 255, 255, 0.2)",
+          borderRadius: 4,
         },
       ],
     },
@@ -525,26 +531,32 @@ function renderRadarChart() {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        r: {
-          angleLines: { color: "rgba(255, 255, 255, 0.05)" },
+        y: {
           grid: { color: "rgba(255, 255, 255, 0.1)" },
-          pointLabels: { color: "#9ba1a6", font: { size: 11 } },
-          ticks: { display: false, min: 0, max: 10 },
+          ticks: { color: "#9ba1a6" },
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: "#9ba1a6", font: { size: 11 } },
         },
       },
       plugins: {
-        legend: { position: "bottom", labels: { color: "#f0f2f5" } },
-        tooltip: { enabled: false }, // Hide tooltip, show raw data below
+        legend: { position: "top", labels: { color: "#f0f2f5", boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              let val = context.parsed.y.toFixed(1);
+              let label = context.dataset.label + ": " + val;
+              if (context.dataIndex === 0)
+                label += state.isMetric ? " kg" : " lbs";
+              if (context.dataIndex === 1) label += "%";
+              return label;
+            },
+          },
+        },
       },
     },
   });
-
-  // Display raw numbers below chart
-  ui.chartRawData.innerHTML = `
-        <div class="raw-data-item">Raw FFMI<span>${stats.ffmi.toFixed(1)}</span></div>
-        <div class="raw-data-item">Body Fat<span>${stats.bodyFat}%</span></div>
-        <div class="raw-data-item">BMI<span>${stats.bmi.toFixed(1)}</span></div>
-    `;
 }
 
 function calculateAndRenderMacros() {

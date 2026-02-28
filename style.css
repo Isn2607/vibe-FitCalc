@@ -147,7 +147,7 @@ body {
 
 @media (min-width: 1200px) {
   .dashboard-row {
-  align-items: stretch;
+    align-items: stretch;
     flex-direction: row;
   }
   .dashboard-col-large {
@@ -409,7 +409,6 @@ input:checked + .slider:before {
 
 /* Metrics Table */
 .table-container {
-  flex-grow: 1;
   overflow-x: auto;
 }
 
