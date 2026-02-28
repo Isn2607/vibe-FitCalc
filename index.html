@@ -141,38 +141,41 @@
               <h2 class="card__title">Overall Fitness Score</h2>
               <div class="score-container">
                 <!-- SVG Gauge -->
-                <div class="gauge-wrapper">
-                  <svg viewBox="0 0 100 50" class="gauge">
-                    <path
-                      class="gauge-bg"
-                      d="M 10,50 A 40,40 0 0,1 90,50"
-                      fill="none"
-                      stroke-width="10"
-                      stroke-linecap="round"
-                    />
-                    <path
-                      id="gaugePath"
-                      class="gauge-fill"
-                      d="M 10,50 A 40,40 0 0,1 90,50"
-                      fill="none"
-                      stroke-width="10"
-                      stroke-linecap="round"
-                      stroke-dasharray="125.6"
-                      stroke-dashoffset="125.6"
-                    />
-                  </svg>
-                  <div class="gauge-content">
-                    <span id="scoreValue" class="gauge-value">0</span>
-                    <span id="scoreStatus" class="gauge-status">Pending</span>
+                <div class="score-visuals-col">
+                  <div class="gauge-wrapper">
+                    <svg viewBox="0 0 100 50" class="gauge">
+                      <path
+                        class="gauge-bg"
+                        d="M 10,50 A 40,40 0 0,1 90,50"
+                        fill="none"
+                        stroke-width="10"
+                        stroke-linecap="round"
+                      />
+                      <path
+                        id="gaugePath"
+                        class="gauge-fill"
+                        d="M 10,50 A 40,40 0 0,1 90,50"
+                        fill="none"
+                        stroke-width="10"
+                        stroke-linecap="round"
+                        stroke-dasharray="125.6"
+                        stroke-dashoffset="125.6"
+                      />
+                    </svg>
+                    <div class="gauge-content">
+                      <span id="scoreValue" class="gauge-value">0</span>
+                      <span id="scoreStatus" class="gauge-status">Pending</span>
+                    </div>
                   </div>
+
+                  <!-- BMI Chart -->
+                  <div class="bmi-chart-wrapper">
+                    <canvas id="bmiChart"></canvas>
+                  </div>
+
+                  <!-- Breakdown Reasons -->
                 </div>
 
-                <!-- BMI Chart -->
-                <div class="bmi-chart-wrapper">
-                  <canvas id="bmiChart"></canvas>
-                </div>
-
-                <!-- Breakdown Reasons -->
                 <div class="score-breakdown">
                   <h3>Score Breakdown:</h3>
                   <ul id="scoreReasonsList" class="reasons-list">

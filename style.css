@@ -298,6 +298,7 @@ input:checked + .slider:before {
 /* SVG Gauge Meter */
 .score-container {
   flex: 1 1 0%;
+  min-width: 250px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -453,6 +454,7 @@ input:checked + .slider:before {
 /* Chart Container */
 .chart-wrapper {
   flex: 1 1 0%;
+  min-width: 250px;
   position: relative;
   height: 250px;
   width: 100%;
@@ -484,6 +486,7 @@ input:checked + .slider:before {
 /* Macros & Foods */
 .macro-container {
   flex: 1 1 0%;
+  min-width: 250px;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -591,6 +594,7 @@ input:checked + .slider:before {
 
 .tab-content {
   flex: 1 1 0%;
+  min-width: 250px;
   font-size: 0.95rem;
   color: var(--text-primary);
   white-space: pre-line;
@@ -599,6 +603,7 @@ input:checked + .slider:before {
 
 .suggestion-content {
   flex: 1 1 0%;
+  min-width: 250px;
   font-size: 0.95rem;
   color: var(--text-primary);
   white-space: pre-line;
@@ -611,5 +616,16 @@ input:checked + .slider:before {
   width: 100%;
   height: 250px;
   flex: 1 1 0%;
+  min-width: 250px;
   min-width: 0;
+}
+
+.score-visuals-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  flex: 1 1 0%;
+  min-width: 250px;
 }
